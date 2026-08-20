@@ -111,6 +111,12 @@ h1{font-size:clamp(50px,8vw,108px);letter-spacing:-.075em;line-height:.85;margin
   border-color:rgba(255,255,255,.26);
 }
 
+
+.topic-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:7px}
+.topic-tag{font-size:9px;line-height:1;padding:5px 7px;border-radius:999px;color:#aeb4c2;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.035)}
+.sector-summary{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0 22px}
+.sector-summary .chip{font-size:10px}
+
 </style>
 </head>
 <body>
@@ -176,45 +182,21 @@ function sourceHtml(e){
  return `<div class="source">Fuente: ${label}</div>`;
 }
 
-function renderPillarView(sectorIndex,pillarIndex){
- const s=sectors[sectorIndex];
- const p=s.pillars[pillarIndex];
- const rel=relatedEvents(p.tags);
+function sectorEvents(sector){
+ const map=new Map();
 
- const monthBlocks=months.map((mn,mi)=>{
-   const arr=rel.filter(e=>Number(e.date.split('-')[1])===mi+1);
-   const cards=arr.length?arr.map(e=>`
-    <div class="card">
-      <div class="date">${esc(e.date.split('-')[0])} ${mn.slice(0,3)}</div>
-      <div class="event">${esc(e.name)}</div>
-      <div class="etype">${esc(e.type)}</div>
-      ${sourceHtml(e)}
-    </div>`).join(''):`<div class="empty">Sin hitos seleccionados</div>`;
+ sector.pillars.forEach(p=>{
+   relatedEvents(p.tags).forEach(e=>{
+     if(!map.has(e.name)) map.set(e.name,{event:e,topics:[]});
+     const item=map.get(e.name);
+     if(!item.topics.includes(p.name)) item.topics.push(p.name);
+   });
+ });
 
-   return `<div class="month">
-      <div class="month-head">
-        <div class="month-name">${mn}</div>
-        <div class="month-count">${arr.length||''}</div>
-      </div>
-      <div class="cards">${cards}</div>
-   </div>`;
- }).join('');
-
- const view=document.getElementById('pillarView');
- if(view){
-   view.innerHTML=`
-     <div class="pillar-view-head">
-       <div class="pillar-view-title">${esc(p.name)}</div>
-       <div class="pillar-view-count">${rel.length} hitos · enero–diciembre</div>
-     </div>
-     <div class="year">${monthBlocks}</div>
-     <div class="back-top-wrap">
-       <button class="back-top" onclick="document.querySelector('.panel').scrollIntoView({behavior:'smooth',block:'start'})">↑ Volver arriba</button>
-     </div>`;
- }
-
- document.querySelectorAll('.pillar-tab').forEach((btn,idx)=>{
-   btn.classList.toggle('active',idx===pillarIndex);
+ return [...map.values()].sort((a,b)=>{
+   const [ad,am]=a.event.date.split('-').map(Number);
+   const [bd,bm]=b.event.date.split('-').map(Number);
+   return am-bm || ad-bd || a.event.name.localeCompare(b.event.name,'es');
  });
 }
 
@@ -222,25 +204,50 @@ function openSector(i){
  active=i;
  renderGrid(search.value);
  const s=sectors[i];
+ const rel=sectorEvents(s);
 
- const tabs=s.pillars.map((p,pi)=>
-   `<button class="pillar-tab ${pi===0?'active':''}" onclick="renderPillarView(${i},${pi})">${esc(p.name)}</button>`
- ).join('');
+ const monthBlocks=months.map((mn,mi)=>{
+   const arr=rel.filter(item=>Number(item.event.date.split('-')[1])===mi+1);
+   const cards=arr.length ? arr.map(item=>{
+     const e=item.event;
+     const topicTags=item.topics.map(t=>`<span class="topic-tag">${esc(t)}</span>`).join('');
+     return `<div class="card">
+       <div class="date">${esc(e.date.split('-')[0])} ${mn.slice(0,3)}</div>
+       <div class="event">${esc(e.name)}</div>
+       <div class="etype">${esc(e.type)}</div>
+       <div class="topic-tags">${topicTags}</div>
+       ${sourceHtml(e)}
+     </div>`;
+   }).join('') : `<div class="empty">Sin hitos seleccionados</div>`;
+
+   return `<div class="month">
+     <div class="month-head">
+       <div class="month-name">${mn}</div>
+       <div class="month-count">${arr.length||''}</div>
+     </div>
+     <div class="cards">${cards}</div>
+   </div>`;
+ }).join('');
+
+ const topicChips=s.pillars.map(p=>`<span class="chip">${esc(p.name)}</span>`).join('');
 
  detail.innerHTML=`<div class="panel">
    <div class="phead">
      <div>
        <h2>${s.icon} ${esc(s.name)}</h2>
-       <div class="pdesc">Elige un pilar y revisa sus oportunidades editoriales de enero a diciembre de 2026.</div>
+       <div class="pdesc">Efemérides y oportunidades editoriales del rubro ordenadas directamente de enero a diciembre de 2026.</div>
      </div>
      <button class="close" onclick="closeSector()">×</button>
    </div>
 
-   <div class="pillar-nav">${tabs}</div>
-   <div id="pillarView" class="pillar-view"></div>
+   <div class="sector-summary">${topicChips}</div>
+   <div class="year">${monthBlocks}</div>
+
+   <div class="back-top-wrap">
+     <button class="back-top" onclick="document.querySelector('.panel').scrollIntoView({behavior:'smooth',block:'start'})">↑ Volver arriba</button>
+   </div>
  </div>`;
 
- renderPillarView(i,0);
  detail.scrollIntoView({behavior:'smooth',block:'start'});
 }
 
